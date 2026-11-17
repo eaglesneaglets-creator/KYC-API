@@ -84,6 +84,12 @@ Two ways, both through the same rules and the same audit trail:
 A reviewer's detail view shows the full ID number and links to the scans
 that expire after 5 minutes. Each opening is logged.
 
+A platform reviewing in its own console should not hand bucket links to a
+browser: it fetches each scan with
+`GET /v1/review/verifications/{id}/documents/{id_front|id_back|selfie}/?reviewer=<who>`
+and relays the bytes to its signed-in staff (ONA shows them from `blob:`
+URLs). Each fetch is logged as a view of that document.
+
 ## What changed from the Eagles & Eaglets KYC
 
 | Before (inside the Eagles monolith) | Now |

@@ -163,9 +163,9 @@ def decide(v: Verification, decision: str, actor: str, reason: str = '') -> Veri
     return v
 
 
-def record_view(v: Verification, actor: str) -> None:
-    """A reviewer opened the full record (ID number and scans). Logged."""
-    _log(v, actor, 'viewed')
+def record_view(v: Verification, actor: str, note: str = '') -> None:
+    """A reviewer opened the full record or one scan (note = which). Logged."""
+    _log(v, actor, 'viewed', note=note)
 
 
 # ── Housekeeping ──────────────────────────────────────────────────────────

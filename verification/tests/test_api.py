@@ -222,6 +222,19 @@ def test_a_platform_reviewer_cannot_decide_another_platforms_users(api, other_ap
     assert eagles_reviewer.get('/v1/review/verifications/').data['results'] == []
 
 
+def test_a_reviewer_can_stream_a_scan_and_each_fetch_is_logged(api, reviewer_api, other_api, webhook_calls):
+    from conftest import JPEG
+    vid = submitted(api)
+    url = f'/v1/review/verifications/{vid}/documents/selfie/?reviewer=kofi@ona'
+    r = reviewer_api.get(url)
+    assert r.status_code == 200 and r.content == JPEG
+    assert r['Content-Type'] == 'image/jpeg' and r['Cache-Control'] == 'no-store, private'
+    assert Event.objects.filter(verification_id=vid, action='viewed', note='selfie',
+                                actor='platform:ona-records/kofi@ona').count() == 1
+    assert api.get(url).status_code == 403, 'an ordinary key cannot fetch scans'
+    assert reviewer_api.get(f'/v1/review/verifications/{vid}/documents/passport/').status_code == 404
+
+
 def test_api_schema_is_published(db, client):
     r = client.get('/schema/')
     assert r.status_code == 200 and b'/v1/verifications/' in r.content

@@ -116,6 +116,18 @@ def delete(key: str) -> bool:
         return False
 
 
+def read(key: str) -> bytes | None:
+    """The stored bytes, or None if they cannot be fetched (purged, or the bucket is down)."""
+    try:
+        client = _client()
+        if client is None or not key:
+            return None
+        return client.get_object(Bucket=settings.S3_BUCKET, Key=key)['Body'].read()
+    except Exception:
+        logger.exception('Bucket read failed for %s', key)
+        return None
+
+
 def url_for(key: str) -> str:
     if not key:
         return ''

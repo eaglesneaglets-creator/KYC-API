@@ -7,15 +7,16 @@ platform behind the key, and someone else's id answers 404, not 403, so ids
 cannot be probed.
 """
 
+from django.http import HttpResponse
 from django.shortcuts import get_object_or_404
 from drf_spectacular.utils import extend_schema
 from rest_framework import generics, status
-from rest_framework.exceptions import ValidationError
+from rest_framework.exceptions import NotFound, ValidationError
 from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from . import levels, services
+from . import levels, services, storage
 from .auth import IsPlatform, IsReviewer, is_platform
 from .models import Subject, Verification
 from .serializers import (
@@ -149,6 +150,34 @@ class ReviewDetailView(APIView):
         v = get_object_or_404(_scoped(request).prefetch_related('events'), pk=pk)
         services.record_view(v, _actor(request, request.query_params.get('reviewer', '')))
         return Response(ReviewDetailSerializer(v).data)
+
+
+class ReviewDocumentView(APIView):
+    """
+    The scan itself, streamed through this service. For platforms whose
+    reviewers work in the platform's own console: the platform relays these
+    bytes to its signed-in staff, so no bucket link ever reaches a browser.
+    Each fetch is logged.
+    """
+
+    permission_classes = [IsReviewer]
+
+    @extend_schema(responses={(200, 'application/octet-stream'): bytes},
+                   summary='One document (id_front, id_back or selfie). Each fetch is logged.')
+    def get(self, request, pk, kind):
+        v = get_object_or_404(_scoped(request), pk=pk)
+        doc = v.documents.filter(kind=kind).first()
+        if doc is None or not doc.storage_key:
+            raise NotFound('No such document, or it has been deleted under the retention policy.')
+        body = storage.read(doc.storage_key)
+        if body is None:
+            raise NotFound('The document could not be fetched.')
+        services.record_view(v, _actor(request, request.query_params.get('reviewer', '')), note=kind)
+        resp = HttpResponse(body, content_type=doc.content_type)
+        resp['Cache-Control'] = 'no-store, private'
+        resp['Content-Disposition'] = f'inline; filename="{kind}"'
+        resp['X-Content-Type-Options'] = 'nosniff'
+        return resp
 
 
 class StartReviewView(APIView):

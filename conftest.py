@@ -24,6 +24,10 @@ class FakeBucket:
         self.deleted.append(Key)
         self.objects.pop(Key, None)
 
+    def get_object(self, Bucket, Key):
+        import io
+        return {'Body': io.BytesIO(self.objects[Key])}
+
     def generate_presigned_url(self, op, Params, ExpiresIn):
         return f'https://bucket.test/{Params["Key"]}?expires={ExpiresIn}'
 

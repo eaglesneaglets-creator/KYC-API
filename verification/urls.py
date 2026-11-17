@@ -11,6 +11,7 @@ urlpatterns = [
 
     path('review/verifications/', views.ReviewQueueView.as_view()),
     path('review/verifications/<uuid:pk>/', views.ReviewDetailView.as_view()),
+    path('review/verifications/<uuid:pk>/documents/<str:kind>/', views.ReviewDocumentView.as_view()),
     path('review/verifications/<uuid:pk>/start-review/', views.StartReviewView.as_view()),
     path('review/verifications/<uuid:pk>/decision/', views.DecisionView.as_view()),
 ]
