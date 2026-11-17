@@ -1,0 +1,11 @@
+# Same rule set as the ONA backend. Run: ruff check .
+target-version = "py312"
+line-length = 120
+extend-exclude = ["graft", "*/migrations/*"]
+
+[lint]
+select = ["F", "E9", "B", "SIM", "C4", "PIE", "RET503", "PLE"]
+ignore = ["SIM108"]
+
+[lint.per-file-ignores]
+"config/settings/*.py" = ["F403", "F405"]

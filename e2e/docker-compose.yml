@@ -1,0 +1,65 @@
+# End-to-end test stack: the real image, staging settings, real Postgres,
+# Redis, an S3-compatible bucket (RustFS), the Celery worker, and a webhook
+# receiver standing in for a platform. Run it with:
+#
+#     .venv/Scripts/python e2e/run.py          (Windows; .venv/bin/python elsewhere)
+#
+# Own project name and ports, so it runs beside other local stacks.
+name: kyc-e2e
+
+x-env: &env
+  DJANGO_SETTINGS_MODULE: config.settings.staging
+  SECRET_KEY: e2e-only-secret-key-0123456789-abcdefghijklmnopqrstuvwxyz
+  DATABASE_URL: postgres://kyc:kyc@db:5432/kyc
+  ALLOWED_HOSTS: localhost,127.0.0.1,web
+  ADMIN_URL: back-office-e2e/
+  KYC_FIELD_KEYS: MTExMTExMTExMTExMTExMTExMTExMTExMTExMTExMTE=
+  KYC_HASH_KEY: e2e-only-hash-key
+  S3_BUCKET: kyc-e2e
+  S3_ENDPOINT_URL: http://objectstore:9000
+  S3_ACCESS_KEY_ID: kyce2ekey
+  S3_SECRET_ACCESS_KEY: kyce2esecret
+  S3_REGION: us-east-1
+  S3_ADDRESSING_STYLE: path
+  REDIS_URL: redis://redis:6379/0
+
+services:
+  db:
+    image: postgres:16-alpine
+    environment: {POSTGRES_USER: kyc, POSTGRES_PASSWORD: kyc, POSTGRES_DB: kyc}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U kyc"]
+      interval: 2s
+      retries: 30
+
+  redis:
+    image: redis:7-alpine
+
+  objectstore:
+    image: rustfs/rustfs:latest
+    environment: {RUSTFS_ACCESS_KEY: kyce2ekey, RUSTFS_SECRET_KEY: kyce2esecret}
+
+  web:
+    build: ..
+    environment: *env
+    ports: ["8110:8000"]
+    depends_on:
+      db: {condition: service_healthy}
+      redis: {condition: service_started}
+      objectstore: {condition: service_started}
+
+  worker:
+    build: ..
+    command: ["./start-worker.sh"]
+    environment:
+      <<: *env
+      CELERY_BEAT: "1"
+    depends_on:
+      db: {condition: service_healthy}
+      redis: {condition: service_started}
+
+  # Stands in for a platform's webhook endpoint (same image: it has Python).
+  hook:
+    build: ..
+    command: ["python", "e2e/hook.py"]
+    ports: ["9012:9000"]
