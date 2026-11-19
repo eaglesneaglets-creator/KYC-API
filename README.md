@@ -102,6 +102,28 @@ URLs). Each fetch is logged as a view of that document.
 | ID number checked as "6–20 characters" | Ghana Card format, encrypted, keyed fingerprint for duplicates |
 | Files kept indefinitely | Private bucket, signature-checked uploads, scans deleted after `KYC_DOCUMENT_RETENTION_DAYS` |
 
+## Where files are stored
+
+One private bucket, one folder per platform, one folder per verification:
+
+```
+kyc/platforms/ona-records/<verification id>/id_front-<random>.jpg
+kyc/platforms/ona-records/<verification id>/selfie-<random>.jpg
+kyc/platforms/eagles/<verification id>/…
+```
+
+Staging uses `kyc-staging/` instead of `kyc/`. A platform's scans can be
+listed, exported or erased by its prefix without touching anyone else's.
+The folder is the platform's slug, which is why the slug cannot be changed
+once the platform exists. Files uploaded before this layout are moved with:
+
+```bash
+python manage.py relocate_documents --dry-run   # list what would move
+python manage.py relocate_documents             # copy, repoint, delete the old object
+```
+
+It is safe to stop and run again.
+
 ## Running it locally
 
 ```bash
@@ -135,7 +157,7 @@ image on Postgres, checks the logs for tracebacks, and tears everything down.
 One project, its own Postgres and bucket, separate from every platform's:
 
 1. Service from this repo; settings: healthcheck `/health/`, start command
-   default (`./start.sh`).
+   default (`./start.sh`), `DJANGO_SETTINGS_MODULE=config.settings.production`.
 2. Add Postgres, a Storage Bucket, and (recommended) Redis.
 3. Variables from `.env.example`. Generate `KYC_FIELD_KEYS` and
    `KYC_HASH_KEY` once and keep a copy somewhere safe: losing the field key

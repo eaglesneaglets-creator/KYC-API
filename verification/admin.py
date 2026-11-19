@@ -27,6 +27,11 @@ class PlatformAdmin(admin.ModelAdmin):
     list_display = ['name', 'slug', 'webhook_url', 'is_active', 'created_at']
     inlines = [ApiKeyInline]
 
+    def get_readonly_fields(self, request, obj=None):
+        # The slug names the platform's folder in the bucket; renaming it
+        # would leave its existing scans under the old name.
+        return ['slug'] if obj else []
+
     def save_model(self, request, obj, form, change):
         super().save_model(request, obj, form, change)
         # A webhook URL added here needs a signing secret; show it once.

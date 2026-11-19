@@ -87,7 +87,8 @@ def attach_document(v: Verification, kind: str, file, actor: str) -> Document:
         v = _locked(v)
         if v.status not in EDITABLE:
             raise Conflict('Documents can only change before submitting, or when changes are requested.')
-        stored = storage.upload(file, kind=kind)
+        stored = storage.upload(file, kind=kind, platform_slug=v.subject.platform.slug,
+                                verification_id=v.pk)
         old_key = ''
         doc = v.documents.filter(kind=kind).first()
         if doc:

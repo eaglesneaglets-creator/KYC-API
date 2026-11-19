@@ -6,6 +6,15 @@ sends whatever Content-Type the uploader's client claims; the bytes do not lie.
 
 Nothing here is public. url_for() gives a reviewer a link that expires in
 minutes (S3_URL_EXPIRY_SECONDS) and is built per request, never stored.
+
+Each platform has its own folder, and each verification a folder inside it:
+
+    <S3_KEY_PREFIX>/platforms/<platform slug>/<verification id>/<kind>-<random>.<ext>
+
+so one platform's scans can be listed, exported or erased without touching
+another's. The full key is stored on the Document, so reads never rebuild
+it: changing this layout only affects new uploads (relocate_documents moves
+the old ones).
 """
 
 import hashlib
@@ -86,14 +95,29 @@ def _check(file, kind: str) -> tuple[str, int, str]:
     return mime, size, digest.hexdigest()
 
 
-def upload(file, *, kind: str) -> dict:
+def platform_prefix(platform_slug: str) -> str:
+    """The folder holding every file of one platform (ends with '/')."""
+    if not platform_slug or '/' in platform_slug:
+        raise ValueError(f'Not a usable platform slug: {platform_slug!r}')
+    return f'{settings.S3_KEY_PREFIX}/platforms/{platform_slug}/'
+
+
+def document_key(platform_slug: str, verification_id, kind: str, ext: str) -> str:
+    """
+    Where a new upload goes. The random part keeps a replacement from
+    overwriting the file it replaces before the database has committed.
+    """
+    return f'{platform_prefix(platform_slug)}{verification_id}/{kind}-{uuid.uuid4().hex[:12]}{ext}'
+
+
+def upload(file, *, kind: str, platform_slug: str, verification_id) -> dict:
     """Store an ID document. Returns {'key', 'content_type', 'size', 'sha256'}."""
     mime, size, sha = _check(file, kind)
     client = _client()
     if client is None:
         logger.error('No storage bucket is configured; upload rejected')
         raise ValidationError({'file': 'Uploads are not available right now.'})
-    key = f'{settings.S3_KEY_PREFIX}/documents/{uuid.uuid4().hex}{EXTENSIONS[mime]}'
+    key = document_key(platform_slug, verification_id, kind, EXTENSIONS[mime])
     try:
         client.upload_fileobj(file, settings.S3_BUCKET, key, ExtraArgs={'ContentType': mime})
     except Exception:
@@ -113,6 +137,21 @@ def delete(key: str) -> bool:
         return True
     except Exception:
         logger.exception('Bucket delete failed for %s', key)
+        return False
+
+
+def copy(src: str, dest: str) -> bool:
+    """Server-side copy inside the bucket (the bytes never leave it)."""
+    try:
+        client = _client()
+        if client is None or not src or not dest:
+            return False
+        client.copy_object(Bucket=settings.S3_BUCKET, Key=dest,
+                           CopySource={'Bucket': settings.S3_BUCKET, 'Key': src},
+                           MetadataDirective='COPY')
+        return True
+    except Exception:
+        logger.exception('Bucket copy failed for %s', src)
         return False
 
 

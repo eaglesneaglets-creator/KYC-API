@@ -56,7 +56,10 @@ TEMPLATES = [{
     ]},
 }]
 
-DATABASES = {'default': dj_database_url.parse(config('DATABASE_URL'), conn_max_age=60)}
+# Connections are reused for a minute; a health check first means one that
+# Postgres closed meanwhile (restart, idle timeout) is replaced, not an error.
+DATABASES = {'default': dj_database_url.parse(config('DATABASE_URL'), conn_max_age=60,
+                                              conn_health_checks=True)}
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 AUTH_PASSWORD_VALIDATORS = [

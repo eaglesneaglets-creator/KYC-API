@@ -20,6 +20,9 @@ class FakeBucket:
     def upload_fileobj(self, f, bucket, key, ExtraArgs=None):
         self.objects[key] = f.read()
 
+    def copy_object(self, Bucket, Key, CopySource, MetadataDirective=None):
+        self.objects[Key] = self.objects[CopySource['Key']]
+
     def delete_object(self, Bucket, Key):
         self.deleted.append(Key)
         self.objects.pop(Key, None)
